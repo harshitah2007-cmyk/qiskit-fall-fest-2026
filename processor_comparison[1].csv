@@ -1,0 +1,3 @@
+Processor,Physical qubits,Logical qubits,Depth,CX gates,SWAP gates,Total operations
+A,5,4,23,9,0,60
+B,9,4,23,9,0,60
