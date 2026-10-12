@@ -1,0 +1,2 @@
+model,accuracy,abnormal_f1,abnormal_recall
+4-qubit VQC,0.4625,0.3582089552238806,0.3
