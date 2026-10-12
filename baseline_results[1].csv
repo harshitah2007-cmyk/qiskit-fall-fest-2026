@@ -1,0 +1,2 @@
+model,accuracy,abnormal_f1,abnormal_recall
+Logistic Regression,0.7466072313026251,0.04552238805970149,0.02668416447944007
