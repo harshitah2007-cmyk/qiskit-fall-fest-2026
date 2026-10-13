@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+cloudpickle
+numpy
+pandas
+scikit-learn
+wfdb
+qiskit==2.5.2
+qiskit-machine-learning==0.9.1
+qiskit-algorithms
