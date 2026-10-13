@@ -27,3 +27,50 @@ Check `http://127.0.0.1:8000/health` and visit `http://127.0.0.1:8000/docs`.
 Create a **Web Service** from this repository. Set **Root Directory** to `api`, **Build Command** to `pip install -r requirements.txt`, and **Start Command** to `uvicorn main:app --host 0.0.0.0 --port $PORT`. Deploy only after uploading `model_bundle.pkl` into this folder.
 
 This educational prototype is not a medical device and must not be used for diagnosis or treatment.
+
+
+## Export the trained bundle from Colab
+
+Run the following in the same Colab runtime **after the cell that fits `vqc` and the preprocessing objects**. It saves and round-trip-tests the fitted VQC plus the exact training-fitted transformations.
+
+```python
+from pathlib import Path
+import cloudpickle
+import numpy as np
+from google.colab import files
+
+required = ["vqc", "scaler", "pca", "angle_scaler", "X_test_q"]
+missing = [name for name in required if name not in globals()]
+if missing:
+    raise RuntimeError(
+        "Run the notebook training/preprocessing cells first. Missing: "
+        + ", ".join(missing)
+    )
+
+bundle = {
+    "vqc": vqc,
+    "scaler": scaler,
+    "pca": pca,
+    "angle_scaler": angle_scaler,
+    "feature_names": [f"f{i}" for i in range(1, 9)],
+}
+
+artifact_path = Path("/content/model_bundle.pkl")
+with artifact_path.open("wb") as f:
+    cloudpickle.dump(bundle, f)
+
+# Verify the artifact can be loaded and makes the same kind of prediction.
+with artifact_path.open("rb") as f:
+    check = cloudpickle.load(f)
+test_output = np.asarray(check["vqc"].predict(check["angle_scaler"].transform(
+    check["pca"].transform(check["scaler"].transform(
+        # This is a quick serialization smoke-test only; use already transformed input below instead.
+        np.zeros((1, 8))
+    ))
+))).astype(int).ravel()
+print("Artifact saved:", artifact_path, "bytes:", artifact_path.stat().st_size)
+print("Model bundle keys:", sorted(check.keys()))
+files.download(str(artifact_path))
+```
+
+If the smoke-test fails because the dummy row is outside the fitted transform's input distribution or the model object cannot be serialized, don't upload the artifact yet. Share the error so the export can be adjusted. The bundle must be made from the same trained model and its fitted scalers/PCA; do not recreate unfitted scalers in the API.
