@@ -65,7 +65,7 @@ predictBtn.addEventListener('click', async () => {
   predictBtn.disabled = true;
   predictionStatus.textContent = 'Sending the file to the model API… The first request may take a little while.';
   try {
-    const response = await fetch(API_URL.replace(/\\/$/, '') + '/predict', {method:'POST', body:formData});
+    const response = await fetch((API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL) + '/predict', {method:'POST', body:formData});
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || 'The model API returned an error.');
     const firstLabels = (result.predictions || []).slice(0, 12).map(p => 'Beat ' + p.beat + ': ' + p.class_label).join(' · ');
