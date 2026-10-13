@@ -59,17 +59,13 @@ artifact_path = Path("/content/model_bundle.pkl")
 with artifact_path.open("wb") as f:
     cloudpickle.dump(bundle, f)
 
-# Verify the artifact can be loaded and makes the same kind of prediction.
+# Round-trip test: load the saved file and run inference on prepared examples.
 with artifact_path.open("rb") as f:
     check = cloudpickle.load(f)
-test_output = np.asarray(check["vqc"].predict(check["angle_scaler"].transform(
-    check["pca"].transform(check["scaler"].transform(
-        # This is a quick serialization smoke-test only; use already transformed input below instead.
-        np.zeros((1, 8))
-    ))
-))).astype(int).ravel()
+test_output = np.asarray(check["vqc"].predict(X_test_q[:2])).astype(int).ravel()
+
 print("Artifact saved:", artifact_path, "bytes:", artifact_path.stat().st_size)
-print("Model bundle keys:", sorted(check.keys()))
+print("Test predictions after reload:", test_output.tolist())
 files.download(str(artifact_path))
 ```
 
