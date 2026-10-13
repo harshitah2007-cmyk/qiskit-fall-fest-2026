@@ -13,6 +13,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 FEATURES = [f"f{i}" for i in range(1, 9)]
+MAX_BEATS_PER_REQUEST = 100
 MODEL_PATH = Path(os.getenv("MODEL_BUNDLE_PATH", Path(__file__).parent / "model_bundle.pkl"))
 
 app = FastAPI(
@@ -208,6 +209,12 @@ async def predict(
         signal = parse_signal(payload)
         input_features, peak_indices = beat_features(signal, sampling_rate)
         source_type = "raw_signal"
+
+    if len(input_features) > MAX_BEATS_PER_REQUEST:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Please upload at most {MAX_BEATS_PER_REQUEST} beat rows per request; this demo limits batch size to keep inference responsive.",
+        )
 
     predictions = run_vqc(input_features)
     result_rows = []
