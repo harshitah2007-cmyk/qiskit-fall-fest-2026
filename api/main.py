@@ -24,14 +24,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://harshitah2007-cmyk.github.io",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ],
+    # Public static website + public demo API; no cookies or credentials are used.
+    # A wildcard avoids browser preflight failures if the site is opened from a
+    # preview URL or another allowed demo page.
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    max_age=600,
 )
 
 _bundle: dict[str, Any] | None = None
