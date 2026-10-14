@@ -85,8 +85,8 @@ def health() -> dict[str, Any]:
     }
 
 
-def parse_feature_csv(payload: bytes) -> pd.DataFrame | None:
-    """Return f1...f8 rows when an uploaded CSV contains the model features."""
+def parse_feature_csv(payload: bytes) -> tuple[pd.DataFrame, np.ndarray | None] | None:
+    """Parse f1...f8 rows and, optionally, a known label column for evaluation."""
     try:
         table = pd.read_csv(io.BytesIO(payload), sep=None, engine="python")
     except Exception:
@@ -94,17 +94,41 @@ def parse_feature_csv(payload: bytes) -> pd.DataFrame | None:
     normalized = {str(col).strip().lower(): col for col in table.columns}
     if not all(name in normalized for name in FEATURES):
         return None
+
     feature_table = table[[normalized[name] for name in FEATURES]].copy()
     feature_table.columns = FEATURES
     for col in FEATURES:
         feature_table[col] = pd.to_numeric(feature_table[col], errors="coerce")
-    feature_table = feature_table.replace([np.inf, -np.inf], np.nan).dropna()
+    feature_table = feature_table.replace([np.inf, -np.inf], np.nan)
+
+    # If present, label/true_label is the dataset ground truth (0=Normal, 1=Abnormal).
+    label_key = "label" if "label" in normalized else ("true_label" if "true_label" in normalized else None)
+    labels: pd.Series | None = None
+    if label_key is not None:
+        labels = pd.to_numeric(table[normalized[label_key]], errors="coerce")
+        valid = feature_table.notna().all(axis=1) & labels.notna()
+        feature_table = feature_table.loc[valid].copy()
+        labels = labels.loc[valid]
+        if labels.empty:
+            raise HTTPException(
+                status_code=400,
+                detail="The CSV contains f1...f8 and a label column, but no complete numeric rows.",
+            )
+        if not labels.isin([0, 1]).all():
+            raise HTTPException(
+                status_code=400,
+                detail="Labels must be 0 (Normal) or 1 (Abnormal).",
+            )
+        labels = labels.astype(int)
+    else:
+        feature_table = feature_table.dropna()
+
     if feature_table.empty:
         raise HTTPException(
             status_code=400,
             detail="The CSV has f1...f8 columns, but no complete numeric feature rows.",
         )
-    return feature_table
+    return feature_table, (labels.to_numpy(dtype=int) if labels is not None else None)
 
 
 def parse_signal(payload: bytes) -> np.ndarray:
@@ -200,8 +224,10 @@ async def predict(
     if not payload:
         raise HTTPException(status_code=400, detail="The uploaded file is empty.")
 
-    feature_table = parse_feature_csv(payload)
-    if feature_table is not None:
+    feature_result = parse_feature_csv(payload)
+    ground_truth: np.ndarray | None = None
+    if feature_result is not None:
+        feature_table, ground_truth = feature_result
         input_features = feature_table[FEATURES].to_numpy(dtype=float)
         source_type = "precomputed_features"
         peak_indices: list[int] = []
@@ -231,6 +257,22 @@ async def predict(
 
     normal_count = int(np.sum(predictions == 0))
     abnormal_count = int(np.sum(predictions == 1))
+    evaluation: dict[str, Any] | None = None
+    if ground_truth is not None:
+        y_true = ground_truth.astype(int)
+        y_pred = predictions.astype(int)
+        tp = int(np.sum((y_true == 1) & (y_pred == 1)))
+        tn = int(np.sum((y_true == 0) & (y_pred == 0)))
+        fp = int(np.sum((y_true == 0) & (y_pred == 1)))
+        fn = int(np.sum((y_true == 1) & (y_pred == 0)))
+        evaluation = {
+            "evaluated_examples": int(len(y_true)),
+            "accuracy": float(np.mean(y_true == y_pred)),
+            "abnormal_f1": float((2 * tp) / max(2 * tp + fp + fn, 1)),
+            "abnormal_recall": float(tp / max(tp + fn, 1)),
+            "confusion_matrix": [[tn, fp], [fn, tp]],
+            "note": "Metrics compare predictions with the uploaded dataset labels. Use held-out examples not used to fit the model.",
+        }
     return {
         "ok": True,
         "source_type": source_type,
@@ -239,6 +281,7 @@ async def predict(
         "abnormal_labelled_count": abnormal_count,
         "sampling_rate_hz": sampling_rate if source_type == "raw_signal" else None,
         "predictions": result_rows,
+        "evaluation": evaluation,
         "disclaimer": (
             "Research prototype only. Labels are experimental model outputs, not a diagnosis. "
             "The model was evaluated on a small balanced subset and is not clinically validated."
