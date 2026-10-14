@@ -69,7 +69,19 @@ predictBtn.addEventListener('click', async () => {
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || 'The model API returned an error.');
     const firstLabels = (result.predictions || []).slice(0, 12).map(p => 'Beat ' + p.beat + ': ' + p.class_label).join(' · ');
-    predictionStatus.textContent = 'Experimental model output for ' + result.beats_classified + ' beat(s): ' + result.normal_labelled_count + ' Normal-labelled, ' + result.abnormal_labelled_count + ' Abnormal-labelled. ' + (firstLabels ? 'First labels: ' + firstLabels + '. ' : '') + result.disclaimer;
+    let evaluationText = '';
+    if (result.evaluation) {
+      const e = result.evaluation;
+      const pct = n => (100 * n).toFixed(2) + '%';
+      evaluationText = ' EVALUATION vs uploaded labels: accuracy ' + pct(e.accuracy) +
+        ', abnormal-class F1 ' + Number(e.abnormal_f1).toFixed(4) +
+        ', abnormal recall ' + pct(e.abnormal_recall) +
+        '. Confusion matrix [[TN, FP], [FN, TP]] = ' + JSON.stringify(e.confusion_matrix) +
+        '. Evaluated examples: ' + e.evaluated_examples + '.';
+    } else {
+      evaluationText = ' No accuracy can be calculated unless this is a feature CSV with a ground-truth label column (label=0 normal, 1 abnormal).';
+    }
+    predictionStatus.textContent = 'Experimental model output for ' + result.beats_classified + ' beat(s): ' + result.normal_labelled_count + ' Normal-labelled, ' + result.abnormal_labelled_count + ' Abnormal-labelled. ' + (firstLabels ? 'First labels: ' + firstLabels + '. ' : '') + evaluationText + ' ' + result.disclaimer;
   } catch (error) {
     predictionStatus.textContent = 'Could not get a model output: ' + (error?.message || 'unknown error') + ' Please check whether the API is awake and deployed.';
   } finally {
