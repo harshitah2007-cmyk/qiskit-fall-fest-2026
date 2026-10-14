@@ -70,3 +70,10 @@ files.download(str(artifact_path))
 ```
 
 If the smoke-test fails because the dummy row is outside the fitted transform's input distribution or the model object cannot be serialized, don't upload the artifact yet. Share the error so the export can be adjusted. The bundle must be made from the same trained model and its fitted scalers/PCA; do not recreate unfitted scalers in the API.
+
+
+## Evaluate accuracy from a labelled feature CSV
+
+A CSV with columns `f1`...`f8` and a `label` (or `true_label`) column can be uploaded to `/predict`. The labels are treated as ground truth only for the response's evaluation metrics; they are not fed into the model. Labels must be `0` (Normal) or `1` (Abnormal). The response includes accuracy, abnormal-class F1, abnormal-class recall, and a confusion matrix in `[[TN, FP], [FN, TP]]` order.
+
+Use a held-out test set. Do not use training rows to claim evaluation accuracy. Results may vary slightly if the sampler is stochastic, and the current prototype's small balanced test subset is not a clinical validation.
