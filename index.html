@@ -45,7 +45,7 @@ body:after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.16;z-i
 <script>
 const input=document.getElementById('fileInput'),drop=document.getElementById('drop'),status=document.getElementById('fileStatus'),svg=document.getElementById('signalSvg');
 // Fill this in after the Python API is deployed on Render.
-const API_URL = "";
+const API_URL = "https://vqc-ecg-api.onrender.com";
 const predictBtn = document.getElementById('predictBtn');
 const predictionStatus = document.getElementById('predictionStatus');
 predictBtn.addEventListener('click', async () => {
